@@ -59,7 +59,7 @@
     <jacoco.line.min>0.80</jacoco.line.min>
 
     <!-- Plugins: Spring Boot no los administra, van con version explicita. -->
-    <jacoco.version>0.8.13</jacoco.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <spotless.version>2.44.5</spotless.version>
     <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
     <checkstyle.version>10.26.1</checkstyle.version>
