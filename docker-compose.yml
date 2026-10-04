@@ -1,0 +1,87 @@
+# Servicios base (HU 01.1). Por defecto solo infraestructura base.
+# Perfiles adicionales en compose/: compose/cluster.yml (Redis Cluster),
+# compose/obs.yml (observabilidad) y compose/full.yml (app incluida).
+name: tix-platform
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: tickets
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d tickets"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      # Sin start_period, los fallos cuentan desde el segundo cero y la primera
+      # ejecucion (initdb + CREATE DATABASE + reinicio) puede tardar mas que
+      # interval x retries, dejando el contenedor unhealthy y bloqueando a
+      # pgbouncer, que depende de service_healthy. Durante start_period los
+      # fallos no cuentan.
+      start_period: 60s
+
+  pgbouncer:
+    # La imagen escucha en 5432 por defecto (LISTEN_PORT); el host publica 6432.
+    # AUTH_TYPE=scram-sha-256 porque postgres:17 storea las claves con
+    # password_encryption=scram-sha-256; el entrypoint de la imagen escribe el
+    # userlist desde DATABASE_URL.
+    image: edoburu/pgbouncer:v1.26.0-p0
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@postgres:5432/tickets
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+    ports: ["${PGBOUNCER_PORT:-6432}:5432"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      # postgresql-client viene en la imagen, asi que pg_isready esta disponible.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U app -d tickets"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  kafka:
+    # 4.x usa KRaft por defecto. INTERNAL es el listener para la app que corre
+    # dentro de la red de Compose (perfil full); PLAINTEXT anuncia localhost
+    # para la app que corre fuera de Docker.
+    image: apache/kafka:4.2.2
+    ports: ["${KAFKA_PORT:-9092}:9092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT:-9092},INTERNAL://kafka:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  pgdata: {}
+  redisdata: {}

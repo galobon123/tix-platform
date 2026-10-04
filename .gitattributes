@@ -1,0 +1,30 @@
+# Normalizacion de fin de linea.
+#
+# Sin esto, git en Windows (core.autocrlf=true por defecto) commitea los shell
+# scripts con CRLF y el CI de Linux los corre con "/bin/sh^M":
+#     bad interpreter: /bin/sh^M: no such file or directory
+# Los modulos traen su propio .gitattributes (Initializr) para /mvnw; este
+# cubre la raiz, donde viven el mvnw y los scripts de /scripts.
+
+# Todo texto se normaliza a LF en el repositorio...
+* text=auto eol=lf
+
+# ...con dos excepciones, porque Windows los necesita con CRLF para ejecutarlos.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Scripts que deben ser LF en cualquier plataforma, sin excepcion.
+mvnw      text eol=lf
+mvnw.cmd  text eol=crlf
+*.sh      text eol=lf
+
+# Binarios: no tocar.
+*.jar        binary
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary
+*.pdf        binary
+*.zip        binary
+*.gz         binary

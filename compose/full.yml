@@ -1,0 +1,39 @@
+# Perfil `full`: ademas de la infraestructura base, levanta la app.
+# Uso: make full   (equivale a COMPOSE_FILE=docker-compose.yml:compose/full.yml docker compose --profile full up -d --wait)
+#
+# La imagen la construye HU 08.1. mientras tanto se espera que exista
+# localmente como tix-api:local (o sobreescribir con API_IMAGE).
+name: tix-platform
+
+services:
+  api:
+    image: ${API_IMAGE:-tix-api:local}
+    profiles: ["full"]
+    ports: ["${API_PORT:-8080}:8080"]
+    environment:
+      # Migraciones (Flyway) contra Postgres DIRECTO, nunca por PgBouncer:
+      # DDL y locks de sesion no sobreviven al pool en modo transaction.
+      DB_URL: jdbc:postgresql://postgres:5432/tickets
+      DB_USER: app
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      # Trafico de la app, pooled.
+      POOL_URL: jdbc:postgresql://pgbouncer:5432/tickets
+      REDIS_URL: redis://redis:6379
+      REDIS_LOCKS_URL: redis://redis:6379
+      # Listener INTERNAL: dentro de la red de Compose no se usa localhost.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4317
+    depends_on:
+      postgres: { condition: service_healthy }
+      pgbouncer: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      # Asume que la imagen trae wget o curl. Si HU 08.1 arma una imagen
+      # distroless, hay que declarar un HEALTHCHECK en el Dockerfile en vez de
+      # depender de un binario que no existe.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 60s

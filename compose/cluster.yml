@@ -1,0 +1,95 @@
+# Perfil `cluster`: Redis Cluster de 6 nodos (3 masters + 3 réplicas) para
+# reproducir el cluster de producción. NO reemplaza al `redis` de la infra base:
+# ambos conviven, por eso los nodos se publican en 7001-7006 y no en 6379.
+#
+#   make cluster      # levanta los 6 nodos y crea el cluster
+#   make cluster-down
+#
+# OJO: en modo cluster Redis anuncia IPs de contenedor. Desde el host (Windows)
+# no son alcanzables, asi que la app tiene que correr dentro de la red de
+# Compose (`make full`) para usar el cluster.
+name: tix-platform
+
+x-redis-node: &redis-node
+  image: redis:7
+  profiles: ["cluster"]
+  command:
+    - redis-server
+    - --cluster-enabled
+    - "yes"
+    - --cluster-config-file
+    - nodes.conf
+    - --cluster-node-timeout
+    - "5000"
+    - --appendonly
+    - "yes"
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
+services:
+  redis-1:
+    <<: *redis-node
+    volumes: ["redis-1-data:/data"]
+    ports: ["7001:6379"]
+
+  redis-2:
+    <<: *redis-node
+    volumes: ["redis-2-data:/data"]
+    ports: ["7002:6379"]
+
+  redis-3:
+    <<: *redis-node
+    volumes: ["redis-3-data:/data"]
+    ports: ["7003:6379"]
+
+  redis-4:
+    <<: *redis-node
+    volumes: ["redis-4-data:/data"]
+    ports: ["7004:6379"]
+
+  redis-5:
+    <<: *redis-node
+    volumes: ["redis-5-data:/data"]
+    ports: ["7005:6379"]
+
+  redis-6:
+    <<: *redis-node
+    volumes: ["redis-6-data:/data"]
+    ports: ["7006:6379"]
+
+  # Job de inicializacion: una sola pasada, espera a que los nodos respondan.
+  redis-cluster-init:
+    image: redis:7
+    profiles: ["cluster"]
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        for i in $$(seq 1 30); do
+          if redis-cli -h redis-1 -p 6379 ping | grep -q PONG; then break; fi
+          echo "esperando redis-1 ($$i/30)"; sleep 2
+        done
+        redis-cli --cluster create \
+          redis-1:6379 redis-2:6379 redis-3:6379 \
+          redis-4:6379 redis-5:6379 redis-6:6379 \
+          --cluster-replicas 1 --cluster-yes
+    depends_on:
+      redis-1: { condition: service_healthy }
+      redis-2: { condition: service_healthy }
+      redis-3: { condition: service_healthy }
+      redis-4: { condition: service_healthy }
+      redis-5: { condition: service_healthy }
+      redis-6: { condition: service_healthy }
+    restart: "no"
+
+volumes:
+  redis-1-data: {}
+  redis-2-data: {}
+  redis-3-data: {}
+  redis-4-data: {}
+  redis-5-data: {}
+  redis-6-data: {}

@@ -1,0 +1,26 @@
+.env
+target/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.log
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Maven / Spring Boot
+dependency-reduced-pom.xml
+release.properties
+.flattened-pom.xml
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# JVM
+*.hprof
+hs_err_pid*
