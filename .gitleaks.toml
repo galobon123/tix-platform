@@ -1,0 +1,42 @@
+# HU 01.3 / tarea 4: configuracion de gitleaks.
+#
+# Se usa extendiendo la config por defecto de gitleaks en vez de escribir las
+# reglas a mano: la default ya conoce los formatos de API keys de AWS, GitHub,
+# GCP, JWT y mas. Escribir un regex propio suele ser peor: o deja pasar
+# secretos o el repo se llena de falsos positivos.
+title = "tix-platform"
+
+[extend]
+useDefault = true
+
+# Allowlist global (sintaxis nueva: [[allowlists]], no whitelist).
+[[allowlists]]
+description = "Rutas que no son secretos aunque el regex las marque"
+paths = [
+  # Documentacion: los ejemplos de la HU van con placeholders tipo <token>,
+  # pero algunos tienen forma de clave real y disparan falsos positivos.
+  '''(?i)docs/''',
+  '''(?i)\.md$''',
+  # Archivos de lock: los hashes de checksum de Maven son hex largo y se
+  # parecen a algunos formatos de token.
+  '''(?i)\.lock$''',
+  '''(?i)target/''',
+  # Stack de HU 01.1. Son valores de desarrollo, no secretos de produccion.
+  '''(?i)docker-compose.*\.ya?ml$''',
+  '''(?i)\.env\.example$''',
+]
+
+# Allowlist separada y solo para esos paths, para tolerar placeholders.
+[[allowlists]]
+description = "Placeholders de docker-compose y .env.example"
+regexes = [
+  '''(?i)change-me''',
+  '''(?i)example''',
+  '''(?i)sample''',
+  '''(?i)dummy''',
+  '''(?i)placeholder''',
+]
+paths = [
+  '''(?i)docker-compose.*\.ya?ml$''',
+  '''(?i)\.env\.example$''',
+]

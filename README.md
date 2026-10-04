@@ -254,6 +254,124 @@ usan el directo"— que sigue sin verificarse**: no hay Flyway ni `datasource` e
 `application.yaml`, así que no hay migración que todavía. Se cierra en HU 03.1; mientras
 tanto la separación de URLs queda documentada arriba y en `.env.example`.
 
+## Quality gates (HU 01.3)
+
+Un solo comando corre todo: `./mvnw -B verify`. En orden:
+
+| Gate | Plugin | Qué falla |
+|---|---|---|
+| Formato | Spotless 2.44.5 (Google Java Format AOSP) | código o `pom.xml` sin formatear |
+| Lint | Checkstyle 10.26.1 (`config/checkstyle/checkstyle.xml`) | cualquier violación |
+| Tests | JUnit 5 + Testcontainers 2.0.2 | un test rojo |
+| Cobertura | JaCoCo 0.8.13 | LINE < 80 % en `domain`/`application` |
+
+Los tests de integración levantan **PostgreSQL, Redis y Kafka reales** en contenedores
+efímeros (`postgres:17`, `redis:7`, `apache/kafka:4.2.2`). No hay H2 ni broker embebido:
+si el test pasa, la infraestructura funciona de verdad.
+
+### Los gates están probados, no asumidos
+
+Un gate que nunca falla no sirve de nada, así que cada uno se verificó en las dos
+direcciones (2026-10-04):
+
+| Gate | Provocación | Resultado esperado | Resultado obtenido |
+|---|---|---|---|
+| Checkstyle | línea de 129 caracteres | falla | `LineLength: La línea es mayor de 120 caracteres` |
+| Spotless | `pom.xml` con una línea mal formada | falla | `The following files had format violations` |
+| JaCoCo | clase en `domain` sin tests, umbral 0.99 | falla | `lines covered ratio is 0.00, but expected minimum is 0.99` |
+| JaCoCo | misma clase **con** test, umbral 0.99 | pasa | `All coverage checks have been met` |
+| JaCoCo | `domain`/`application` vacíos, umbral 0.80 | pasa | `All coverage checks have been met` |
+| gitleaks | clave privada RSA en el repo | falla | `leaks found: 1` (exit 1) |
+| gitleaks | repo sin secretos | pasa | `no leaks found` (exit 0) |
+| Trivy | `spring-boot 4.0.0` | falla | `CVE-2026-40976` CRITICAL + 2 HIGH (exit 1) |
+| Trivy | `spring-boot 4.0.6` + Spring Framework 7.0.8 | pasa | 0 CRITICAL/HIGH (exit 0) |
+
+Comprobación manual de los dos últimos, sin salir de la máquina:
+
+```bash
+# secretos (el repo limpio tiene que dar 0; con una clave plantada, 1)
+docker run --rm -v .:/repo -w /repo ghcr.io/gitleaks/gitleaks:latest \
+  detect --source=/repo --config=/repo/.gitleaks.toml --no-git
+
+# CVEs de dependencias
+docker run --rm -v .:/repo -v ~/.m2:/root/.m2 -v trivy-cache:/root/.cache/trivy \
+  -w /repo aquasec/trivy:latest fs --scanners vuln --severity CRITICAL,HIGH \
+  --exit-code 1 --offline-scan .
+```
+
+En PowerShell el equivalente es `.\mvnw.cmd -B verify`.
+
+### Cobertura: el umbral es real, pero hoy no mide nada
+
+El filtro es `com/tix/**/domain/**` y `com/tix/**/application/**`. Esos paquetes existen
+pero están vacíos: el primer código de negocio llega con HU 02.1 (`POST /register`). Con el
+árbol vacío el bundle filtra vacío y el check pasa sin medir.
+
+**En cuanto haya una clase, el gate exige 80 % sin tocar nada.** Eso se comprobó plantando
+una clase real sin tests (falló) y con tests (pasó).
+
+Un detalle que costó encontrar: el `<includes>` **dentro de `<rule>`** matchea vacío siempre
+—se probó con notación de barras, de puntos y vacío— y deja el gate muerto sin avisar. Por
+eso el filtro va en el `<includes>` **del goal**, que sí funciona. Si alguna vez se mueve,
+vuelve a comprobar la tabla de arriba.
+
+Para probar que un PR no baja del umbral, sin esperar a tener código de negocio:
+
+```bash
+./mvnw -B verify -Djacoco.line.min=0.99    # debe fallar si hay clases sin cubrir
+```
+
+### Workflows
+
+| Archivo | Qué corre |
+|---|---|
+| `.github/workflows/ci.yml` | `build-test` (verify completo), `gitleaks`, `trivy` |
+| `.github/workflows/codeql.yml` | CodeQL (SAST) sobre Java, con schedule semanal |
+| `.github/dependabot.yml` | actualizaciones de Maven y de GitHub Actions |
+| `.gitleaks.toml` | allowlist de gitleaks, extiende la config por defecto |
+
+Disparadores: `pull_request` y `push` sobre `main`, más `workflow_dispatch`. `permissions`
+mínimos por job (`contents: read`, y `security-events: write` solo en CodeQL). `concurrency`
+cancela el run anterior del mismo PR, que ayuda al p90 de < 10 min.
+
+**Dependabot y el multi-módulo:** Dependabot lee *un* `pom.xml` por entrada. Con solo
+`directory: /` los cuatro módulos quedan sin cubrir, así que hay una entrada por pom.
+
+**Trivy necesita el cache de Maven.** Si no, resuelve el árbol de dependencias por red, se
+topa con el rate limit de Maven Central y muere con `FATAL 429`: un build rojo que no
+tiene nada que ver con una vulnerabilidad. Por eso el job corre
+`./mvnw -B -q dependency:go-offline` antes de escanear.
+
+### Pendiente: branch protection (tarea 1, a medias)
+
+No se puede activar sin remoto. Cuando exista, en **Settings → Branches → Add rule** para
+`main`:
+
+- Require a pull request before merging, con al menos 1 aprobación.
+- Require status checks to pass, marcando: `build-test`, `gitleaks`, `trivy`, `Analyze (java-kotlin)`.
+- Require branches to be up to date before merging.
+- Do not allow bypassing the above settings.
+
+Sin ese paso, los checks corren pero nada impide mergear un PR rojo: el CA 1 no se
+sustenta solo con el workflow.
+
+### Desviaciones y límites conocidos
+
+- **Las actions no están fijadas por SHA.** La referencia de la HU pide fijarlas por SHA
+  completo en producción. No se hizo porque un SHA inventado rompe el workflow y uno
+  aproximado rompe la seguridad que se quiere ganar. Hoy van por versión mayor
+  (`actions/checkout@v4`). Es un pendiente antes de publicar el repo.
+- **El p90 de < 10 min no se puede medir todavía.** Sin remoto no hay historial de Actions.
+  La primera medición real sale del primer PR.
+- **El gate de cobertura hoy pasa sin medir**, porque el árbol está vacío, como se explica
+  arriba. No es un defecto del gate, pero tampoco es cobertura: no hay nada que medir hasta
+  HU 02.1.
+- **`spring-framework.version` está sobreescrito a 7.0.8** sobre el BOM de Spring Boot
+  4.0.6, para cerrar el CVE-2026-41850. El override gana sobre el BOM, así que hay que
+  revisarlo en cada PR que suba Spring Boot. Está documentado en el `pom.xml`.
+- **Tareas 5 a 9 de la HU 01.3 sin empezar:** imagen, SBOM, firma cosign, GitOps con
+  ArgoCD y rollback. La 5 depende del Dockerfile, que llega con HU 08.1.
+
 ## Estructura
 
 ```text
@@ -268,6 +386,14 @@ compose/
   alloy/config.alloy
   otel/otel-collector.yml
 scripts/verify-ca.sh      # criterios de aceptación de la HU 01.1
+.github/
+  workflows/ci.yml        # build + tests + cobertura, gitleaks, trivy
+  workflows/codeql.yml    # SAST
+  dependabot.yml          # Maven y GitHub Actions
+.gitleaks.toml            # allowlist de gitleaks
+config/checkstyle/
+  checkstyle.xml          # reglas de lint
+pom.xml                   # reactor: quality gates y versiones
 Makefile
 .env.example
 ```

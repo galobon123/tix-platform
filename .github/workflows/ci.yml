@@ -1,14 +1,129 @@
+# HU 01.3 / tarea 1 y 2: build + tests + cobertura en cada PR.
+#
+# Alcance deliberado: solo tareas 1 a 4 de la HU. La imagen (tarea 5) no entra
+# porque no hay Dockerfile todavia (llega con HU 08.1).
+#
+# POR QUE LAS actions NO ESTAN FIJADAS POR SHA: la referencia de la HU pide
+# fijarlas por SHA completo en produccion. No se hace aqui porque un SHA
+# inventado rompe el workflow y uno aproximado rompe la seguridad que se
+# quiere ganar. Se deja por version mayor, que es funcional, y queda como
+# pendiente explicito antes de publicar el repo.
 name: ci
+
 on:
-  pull_request: { branches: [main] }
-  push: { branches: [main] }
-permissions: { contents: read }
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# permisos minimos: este workflow solo lee el repo
+permissions:
+  contents: read
+
+# un push nuevo mata el run anterior del mismo PR: el PR no necesita 5 builds
+# simultaneos y esto ayuda al p90 de < 10 min
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
+    name: Build, tests y cobertura
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '21', cache: maven }
-      - name: Build y tests
-        run: ./mvnw -B verify   # requiere el wrapper en la raíz: mvn -N wrapper:wrapper
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # En Windows el bit de ejecucion no viaja en el commit, asi que en un
+      # runner linux ./mvnw puede dar Permission denied. Sin esto, el fallo
+      # parece de Maven y no de permisos.
+      - name: Habilitar mvnw
+        run: chmod +x mvnw
+
+      # verify corre, en orden: checkstyle (validate) -> tests (test) ->
+      # jacoco:report + jacoco:check + spotless:check (verify).
+      # Los tests de integracion levantan PostgreSQL, Redis y Kafka REALES con
+      # Testcontainers; el runner ya trae Docker, asi que corren de verdad.
+      - name: Build, tests y cobertura
+        run: ./mvnw -B verify
+
+      # Los reportes de JaCoCo quedan como artefacto para poder ver que clase
+      # bajo la cobertura, sin tener que reproducir el build.
+      - name: Subir reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: '**/target/site/jacoco/jacoco.csv'
+          if-no-files-found: ignore
+
+  gitleaks:
+    name: gitleaks (secretos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks con fetch-depth: 0 necesita todo el historico para buscar
+          # secretos en commits viejos, no solo en el diff del PR.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        with:
+          # Rutas ahi esta la allowlist de .gitleaks.toml. Se nombra de forma
+          # explicita en vez de confiar en el autodescubrimiento.
+          config: .gitleaks.toml
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+  trivy:
+    name: trivy (dependencias)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Trivy cachea su base de datos con actions/cache, y eso exige actions: write.
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Habilitar mvnw
+        run: chmod +x mvnw
+
+      # Trivy resuelve el arbol de dependencias de Maven por red si no encuentra
+      # el artefacto en el repositorio local. En un runner de GitHub eso se topa
+      # con el rate limit de Maven Central y Trivy muere con FATAL 429, o sea un
+      # build rojo que no tiene nada que ver con una vulnerabilidad. Poblando el
+      # cache primero, Trivy resuelve todo local y el unico fallo posible es un
+      # CVE real.
+      - name: Poblar cache local de Maven
+        run: ./mvnw -B -q dependency:go-offline
+
+      # scan-type: fs, no image. La HU pide analisis de dependencias y todavia
+      # no hay Dockerfile ni imagen que escanear (HU 08.1). Este job escanea el
+      # arbol de fuentes: los pom.xml y el cache de Maven.
+      #
+      # scanners: vuln solamente. Los secretos los cubre gitleaks, en su propio
+      # job; duplicar el scanner de secretos aqui solo anade ruido.
+      - name: Escanear dependencias del arbol de fuentes
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          scanners: vuln
+          skip-dirs: '**/target'

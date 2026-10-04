@@ -1,0 +1,73 @@
+# HU 01.3 / tarea 4: Dependabot.
+#
+# Se eligio Dependabot y no Renovate porque viene incluido en GitHub, no pide
+# un token de bot y ya sabe leer poms de Maven sin configuracion extra.
+version: 2
+
+updates:
+  # ------------------------------------------------------------------ Maven
+  # Dependabot mira UN pom por entrada. El proyecto es multi-modulo, asi que
+  # hay que declarar cada pom: con solo "/" el reactor se ignora y los modulos
+  # quedan sin cubrir. Omitir esto es el error clasico en repos multi-modulo.
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+    groups:
+      # Testcontainers y sus modulos tienen que moverse juntos: mezclar una
+      # version de testcontainers-postgresql con otra de testcontainers-kafka
+      # rompe el build.
+      testcontainers:
+        patterns: [org.testcontainers.*, com.redis.testcontainers-redis]
+      # El BOM de Spring Boot maneja el versionado de Testcontainers 2.x;
+      # tocarlo a mano pelea con el BOM.
+      spring:
+        patterns: [org.springframework.*]
+
+  - package-ecosystem: maven
+    directory: /libs/contracts
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+
+  - package-ecosystem: maven
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+
+  - package-ecosystem: maven
+    directory: /worker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+
+  - package-ecosystem: maven
+    directory: /waiting-room
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, java]
+
+  # -------------------------------------------------------- GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, ci]
+
+  # ------------------------------------------------------------------ Docker
+  # commented a proposito: la HU 08.1 es la que trae el Dockerfile y hasta
+  # entonces Dependabot falla con "no Dockerfile found" si se activa.

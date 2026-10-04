@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.0.0</version>
+    <version>4.0.6</version>
     <relativePath/>
   </parent>
 
@@ -16,10 +14,7 @@
   <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>tix-platform</name>
-
-  <properties>
-    <java.version>21</java.version>
-  </properties>
+  <description>Plataforma de venta de tickets - Walking skeleton (HU 01.3)</description>
 
   <modules>
     <module>libs/contracts</module>
@@ -27,4 +22,268 @@
     <module>worker</module>
     <module>waiting-room</module>
   </modules>
+
+  <properties>
+    <java.version>21</java.version>
+
+    <!--
+      OVERRIDE DEL BOM: revisar en cada bump de Spring Boot.
+
+      spring-boot-starter-parent 4.0.6 maneja Spring Framework 7.0.7, que tiene
+      CVE-2026-41850 (HIGH, DoS por expresiones Spel). El fix es 7.0.8 y todavia
+      no entra en el BOM, asi que se fija aca para que el gate de Trivy (tarea 4
+      de la HU 01.3) quede en verde sin excepciones.
+
+      spring-boot-starter-parent 4.0.0 (la version con la que arranco el
+      proyecto) tenia ademas CVE-2026-40976 (CRITICAL) y CVE-2026-40973 (HIGH);
+      ambos se resolvieron subiendo el parent a 4.0.6.
+
+      EL COSTO: esta propiedad gana sobre el BOM. Cuando Dependabot abra un PR
+      subiendo Spring Boot, el override se queda en 7.0.8 y puede chocar con lo
+      que la version nueva de Boot espere. Hay que tocar estas dos lineas en el
+      mismo PR que suba el parent:
+
+        1. borrar <spring-framework.version> si la nueva version de Boot ya
+           trae 7.0.8 o superior;
+        2. si se mantiene, confirmar que el build sigue verde.
+
+      Verificacion local del gate (ver README, seccion "Quality gates"): se corre
+      trivy en modo fs con severity CRITICAL,HIGH, exit-code 1 y offline-scan,
+      con el repo y el cache de .m2 montados en el container.
+    -->
+    <spring-framework.version>7.0.8</spring-framework.version>
+
+    <!-- HU 01.3 tarea 3: cobertura >= 80% lineas en domain/application.
+         El umbral es el de la HU; el gate es tolerante a que no haya clases
+         (ver la nota de TOLERANTE A VACIO en la regla de jacoco mas abajo). -->
+    <jacoco.line.min>0.80</jacoco.line.min>
+
+    <!-- Plugins: Spring Boot no los administra, van con version explicita. -->
+    <jacoco.version>0.8.13</jacoco.version>
+    <spotless.version>2.44.5</spotless.version>
+    <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
+    <checkstyle.version>10.26.1</checkstyle.version>
+  </properties>
+
+  <!--
+    HU 01.3 tarea 2 - Testcontainers con PostgreSQL, Redis y Kafka reales.
+
+    No se declara version: spring-boot-dependencies 4.0.0 importa
+    testcontainers-bom (2.0.2), que maneja los tres. Fijar la version aca
+    pelearia con el BOM sin ganar nada.
+
+    OJO con los nombres: en Testcontainers 2.x todos los modulos se renombraron
+    a testcontainers-<nombre>. Los nombres cortos (org.testcontainers:postgresql,
+    org.testcontainers:junit-jupiter) son de 1.x y NO existen en 2.x; dan
+    "version is missing" porque el BOM no los conoce.
+
+    Redis es la excepcion doble: no esta en testcontainers-bom (Spring Boot lo
+    maneja aparte, version 2.2.4) y su groupId cambio a com.redis. O sea
+    com.redis:testcontainers-redis, no org.testcontainers:testcontainers-redis.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.redis</groupId>
+      <artifactId>testcontainers-redis</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>${checkstyle.plugin.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>${checkstyle.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <!-- ============================ HU 01.3 / tarea 3: cobertura ============ -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+          <execution>
+            <id>jacoco-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <!--
+                TOLERANTE A VACIO, A PROPOSITO.
+
+                Los paquetes domain/application existen pero estan vacios: el
+                primer codigo real llega con HU 02.1 (POST /register). El
+                proyecto today no tiene nada que medir ahi, asi que el bundle
+                filtra vacio y el check pasa sin que haya nada que medir. En
+                cuanto haya una clase, el gate empieza a exigir 80% solo, sin
+                tocar nada.
+
+                Para comprobar que un PR no baja del 80%: mvn
+                -Djacoco.line.min=0.99 verify (debe fallar).
+
+                El filtro de paquetes va ACÁ y no dentro de <rule>. Probado: el
+                <includes> de la regla matchea vacio siempre (se probo con
+                notacion de barras, de puntos y hasta vacio) y el gate queda
+                muerto para siempre sin avisar. El <includes> del goal si
+                filtra, y se verifica levantando una clase sin tests y viendo
+                que el build falla.
+              -->
+              <includes>
+                <include>com/tix/**/domain/**</include>
+                <include>com/tix/**/application/**</include>
+              </includes>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.line.min}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ============================ HU 01.3 / tarea 4: formato y lint ======== -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <googleJavaFormat>
+              <style>AOSP</style>
+            </googleJavaFormat>
+          </java>
+          <pom>
+            <sortPom>
+              <expandEmptyElements>false</expandEmptyElements>
+            </sortPom>
+          </pom>
+        </configuration>
+        <executions>
+          <!-- check corre en verify: si el codigo esta sin formatear, el build
+               falla. apply es local: mvn spotless:apply -->
+          <execution>
+            <id>spotless-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>checkstyle-validate</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>validate</phase>
+            <configuration>
+              <configLocation>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle.xml</configLocation>
+              <includeTestSourceDirectory>true</includeTestSourceDirectory>
+              <consoleOutput>true</consoleOutput>
+              <failOnViolation>true</failOnViolation>
+              <violationSeverity>error</violationSeverity>
+              <logViolationsToConsole>true</logViolationsToConsole>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ==================== tests deterministas (HU 01.3 / tarea 2) ============ -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!--
+            -Duser.timezone=UTC NO es cosmetico: es lo que hace que el gate de
+            Testcontainers de PostgreSQL sea reproducible.
+
+            El driver de PostgreSQL manda como parametro de arranque "TimeZone" la
+            zona por defecto de la JVM. La imagen postgres:17 (Debian slim) no trae
+            America/Buenos_Aires en su tzdata y el servidor la rechaza con:
+
+              PSQL FATAL: invalid value for parameter "TimeZone": "America/Buenos_Aires"
+
+            Sin esto el test pasa en un runner en UTC y falla en cualquier maquina de
+            Argentina o Uruguay. Probado: pasar TimeZone=UTC en la URL de JDBC NO
+            alcanza, el driver lo pisa con la zona de la JVM.
+
+            @{argLine} conserva el agente de JaCoCo, que prepare-agent deja en esa
+            misma propiedad. Sin esto la cobertura se perderia en silencio.
+          -->
+          <argLine>@{argLine} -Duser.timezone=UTC</argLine>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

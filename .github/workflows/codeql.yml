@@ -1,0 +1,64 @@
+# HU 01.3 / tarea 4: CodeQL (SAST) sobre Java.
+#
+# CodeQL va en su propio workflow (y no como job del ci) porque es lo que
+# recomienda GitHub: asi el analisis corre en su propio grupo de checks y se
+# puede exigir por separado en branch protection.
+#
+# Solo analiza Java: el proyecto todavia no tiene JS ni Python.
+name: codeql
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Corre sola aunque nadie toque el repo: las queries de CodeQL se actualizan
+    # y eso puede marcar vulnerabilidades nuevas en codigo viejo.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analizar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # security-events: write es lo que le permite publicar el SARIF.
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java-kotlin]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+          # Con Dependabot los alerts de seguridad ya se abren solos; este
+          # detector FindsDuplicateCode solo sirve si el repo es publico.
+          config: 'security-extended'
+
+      - name: Analizar
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
+
+      - name: Subir resultados
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: codeql-${{ matrix.language }}
