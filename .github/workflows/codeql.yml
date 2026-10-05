@@ -51,8 +51,17 @@ jobs:
           # detector FindsDuplicateCode solo sirve si el repo es publico.
           queries: security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compilar proyecto
+        run: |
+          chmod +x mvnw
+          ./mvnw clean compile -DskipTests
 
       - name: Analizar
         uses: github/codeql-action/analyze@v4
