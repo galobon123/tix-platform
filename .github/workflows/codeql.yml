@@ -41,7 +41,7 @@ jobs:
         language: [java-kotlin]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Inicializar CodeQL
         uses: github/codeql-action/init@v4
