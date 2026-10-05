@@ -51,14 +51,19 @@ jobs:
           # detector FindsDuplicateCode solo sirve si el repo es publico.
           queries: security-extended
 
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compilar proyecto
+        run: |
+          chmod +x mvnw
+          ./mvnw clean compile -DskipTests
+
       - name: Analizar
         uses: github/codeql-action/analyze@v4
         with:
           category: '/language:${{ matrix.language }}'
-
-      - name: Subir resultados
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: codeql-${{ matrix.language }}
