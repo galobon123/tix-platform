@@ -115,7 +115,7 @@ jobs:
       # scanners: vuln solamente. Los secretos los cubre gitleaks, en su propio
       # job; duplicar el scanner de secretos aqui solo anade ruido. 
       - name: Escanear dependencias del arbol de fuentes
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
