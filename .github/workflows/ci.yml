@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v4
         with:
@@ -69,17 +69,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # gitleaks con fetch-depth: 0 necesita todo el historico para buscar
           # secretos en commits viejos, no solo en el diff del PR.
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
-        with:
-          # Rutas ahi esta la allowlist de .gitleaks.toml. Se nombra de forma
-          # explicita en vez de confiar en el autodescubrimiento.
-          config: .gitleaks.toml
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
 
   trivy:
@@ -91,7 +88,7 @@ jobs:
       # Trivy cachea su base de datos con actions/cache, y eso exige actions: write.
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v4
         with:
@@ -116,9 +113,9 @@ jobs:
       # arbol de fuentes: los pom.xml y el cache de Maven.
       #
       # scanners: vuln solamente. Los secretos los cubre gitleaks, en su propio
-      # job; duplicar el scanner de secretos aqui solo anade ruido.
+      # job; duplicar el scanner de secretos aqui solo anade ruido. 
       - name: Escanear dependencias del arbol de fuentes
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
