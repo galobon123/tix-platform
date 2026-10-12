@@ -1,13 +1,13 @@
-# HU 01.3 / tarea 1 y 2: build + tests + cobertura en cada PR.
+# HU 01.3 / tareas 1 a 4: build + tests + cobertura, secretos y dependencias en cada PR.
 #
 # Alcance deliberado: solo tareas 1 a 4 de la HU. La imagen (tarea 5) no entra
 # porque no hay Dockerfile todavia (llega con HU 08.1).
 #
-# POR QUE LAS actions NO ESTAN FIJADAS POR SHA: la referencia de la HU pide
-# fijarlas por SHA completo en produccion. No se hace aqui porque un SHA
-# inventado rompe el workflow y uno aproximado rompe la seguridad que se
-# quiere ganar. Se deja por version mayor, que es funcional, y queda como
-# pendiente explicito antes de publicar el repo.
+# ACTIONS FIJADAS POR SHA: cada "uses:" apunta al commit completo y lleva al
+# lado, como comentario, la version que representa. Una tag se puede mover (en
+# marzo de 2026 reescribieron casi todas las de aquasecurity/trivy-action); un
+# SHA no. Para actualizar, Dependabot (ecosistema github-actions) abre el PR con
+# el SHA nuevo y el comentario de version: ver .github/dependabot.yml.
 name: ci
 
 on:
@@ -22,10 +22,11 @@ permissions:
   contents: read
 
 # un push nuevo mata el run anterior del mismo PR: el PR no necesita 5 builds
-# simultaneos y esto ayuda al p90 de < 10 min
+# simultaneos y esto ayuda al p90 de < 10 min. En main NO se cancela: asi cada
+# commit de main conserva su resultado de CI.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-test:
@@ -33,9 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
@@ -51,17 +52,19 @@ jobs:
       # jacoco:report + jacoco:check + spotless:check (verify).
       # Los tests de integracion levantan PostgreSQL, Redis y Kafka REALES con
       # Testcontainers; el runner ya trae Docker, asi que corren de verdad.
+      # IMPORTANTE (pom): jacoco:report debe ir ANTES que jacoco:check; si no,
+      # cuando falla el umbral no se genera el reporte justo cuando hace falta.
       - name: Build, tests y cobertura
         run: ./mvnw -B verify
 
-      # Los reportes de JaCoCo quedan como artefacto para poder ver que clase
-      # bajo la cobertura, sin tener que reproducir el build.
+      # El reporte HTML completo de JaCoCo queda como artefacto para ver que
+      # clase bajo la cobertura, sin tener que reproducir el build.
       - name: Subir reporte de cobertura
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jacoco-report
-          path: '**/target/site/jacoco/jacoco.csv'
+          path: '**/target/site/jacoco/'
           if-no-files-found: ignore
 
   gitleaks:
@@ -69,15 +72,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # gitleaks con fetch-depth: 0 necesita todo el historico para buscar
           # secretos en commits viejos, no solo en el diff del PR.
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+          # Solo si el repo pertenece a una ORGANIZACION de GitHub (en una cuenta
+          # personal no hace falta). Licencia gratuita en gitleaks.io, guardada
+          # como secreto del repo. Descomentar en ese caso:
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   trivy:
     name: trivy (dependencias)
@@ -86,11 +93,13 @@ jobs:
     permissions:
       contents: read
       # Trivy cachea su base de datos con actions/cache, y eso exige actions: write.
+      # (Ojo: esto no figura en la documentacion de trivy-action. Si no hubo un
+      # error real que lo exigiera, se puede probar sin este permiso.)
       actions: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
@@ -113,9 +122,9 @@ jobs:
       # arbol de fuentes: los pom.xml y el cache de Maven.
       #
       # scanners: vuln solamente. Los secretos los cubre gitleaks, en su propio
-      # job; duplicar el scanner de secretos aqui solo anade ruido. 
+      # job; duplicar el scanner de secretos aqui solo anade ruido.
       - name: Escanear dependencias del arbol de fuentes
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
