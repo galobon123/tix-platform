@@ -1,18 +1,18 @@
-# -f se repite en vez de usar "a:b": con rutas de Windows el ":" choca con la
-# unidad del drive y compose lo interpreta como un archivo inexistente.
+# -f is repeated instead of using "a:b": with Windows paths the ":" clashes with the
+# drive letter and compose interprets it as a nonexistent file.
 DC       := docker compose -f docker-compose.yml
 DC_OBS   := docker compose -f docker-compose.yml -f compose/obs.yml     --profile obs
 DC_FULL  := docker compose -f docker-compose.yml -f compose/full.yml    --profile full
 DC_CLU   := docker compose -f docker-compose.yml -f compose/cluster.yml --profile cluster
 
-# No se define SHELL a proposito. El make de Windows (GnuWin32, GNU Make 3.81)
-# busca /bin/sh, no lo encuentra y ejecuta las recipes con cmd.exe: si el
-# Makefile le fuerza un shell que no existe, todos los targets se rompen.
+# SHELL is deliberately not defined. Windows make (GnuWin32, GNU Make 3.81)
+# looks for /bin/sh, does not find it and runs the recipes with cmd.exe: if the
+# Makefile forces a shell that does not exist, every target breaks.
 #
-# Las recipes de abajo solo usan docker, asi que funcionan en cmd.exe y en sh.
-# Los dos targets que necesitan un shell POSIX (help y verify) lo resuelven
-# solos: verify busca el bash de Git con una ruta sin espacios, porque entrecomillar
-# un path con espacios en cmd.exe es fragil.
+# The recipes below only use docker, so they work both in cmd.exe and in sh.
+# The two targets that need a POSIX shell (help and verify) solve it on their own:
+# verify looks for Git's bash using a path without spaces, because quoting a path
+# with spaces in cmd.exe is fragile.
 GIT_BASH := $(firstword $(wildcard C:/Progra~1/Git/bin/bash.exe) $(wildcard C:/Progra~2/Git/bin/bash.exe))
 VERIFY_SH ?= $(if $(GIT_BASH),"$(GIT_BASH)",sh)
 
@@ -20,61 +20,61 @@ VERIFY_SH ?= $(if $(GIT_BASH),"$(GIT_BASH)",sh)
 .PHONY: help up down reset logs ps psql psql-pgbouncer obs obs-down full full-down cluster cluster-down verify
 
 help:
-	@$(info make up             - infra base y espera a que todo este healthy)
-	@$(info make down           - baja todo, conserva los volumenes)
-	@$(info make reset          - baja todo y BORRA los volumenes)
-	@$(info make logs           - sigue los logs de la infra base)
-	@$(info make ps             - estado de los contenedores)
-	@$(info make psql           - psql contra PostgreSQL directo (5432), para migraciones)
-	@$(info make psql-pgbouncer - psql a traves de PgBouncer (6432), el camino de la app)
-	@$(info make obs            - perfil obs: Prometheus, Grafana, Loki, Alloy, OTel)
-	@$(info make obs-down       - baja el perfil obs)
-	@$(info make full           - perfil full: infra base + la app)
-	@$(info make full-down      - baja el perfil full)
-	@$(info make cluster        - perfil cluster: Redis Cluster de 6 nodos)
-	@$(info make cluster-down   - baja el Redis Cluster)
-	@$(info make verify         - corre los criterios de aceptacion de la HU 01.1)
-	@$(info ver README.md para el detalle de los perfiles y troubleshooting)
+	@$(info make up             - base infra and waits for everything to be healthy)
+	@$(info make down           - brings everything down, keeps the volumes)
+	@$(info make reset          - brings everything down and DELETES the volumes)
+	@$(info make logs           - follows the base infra logs)
+	@$(info make ps             - container status)
+	@$(info make psql           - psql against the direct PostgreSQL (5432), for migrations)
+	@$(info make psql-pgbouncer - psql through PgBouncer (6432), the app path)
+	@$(info make obs            - obs profile: Prometheus, Grafana, Loki, Alloy, OTel)
+	@$(info make obs-down       - brings the obs profile down)
+	@$(info make full           - full profile: base infra + the app)
+	@$(info make full-down      - brings the full profile down)
+	@$(info make cluster        - cluster profile: 6-node Redis Cluster)
+	@$(info make cluster-down   - brings the Redis Cluster down)
+	@$(info make verify         - runs the acceptance criteria of HU 01.1)
+	@$(info see README.md for profile details and troubleshooting)
 	@:
 
-up: ## Levanta la infra base y espera a que todo esté healthy
+up: ## Brings up the base infra and waits for everything to be healthy
 	$(DC) up -d --wait
 
-down: ## Baja todo (incluye contenedores de perfiles), conserva los volúmenes
+down: ## Brings everything down (includes profile containers), keeps the volumes
 	$(DC) down --remove-orphans
 
-reset: ## Borra los volúmenes: la base de datos arranca vacía
+reset: ## Deletes the volumes: the database starts empty
 	$(DC) down --remove-orphans -v
 
-logs: ## Sigue los logs de la infra base
+logs: ## Follows the base infra logs
 	$(DC) logs -f --tail=100
 
-ps: ## Estado de los contenedores
+ps: ## Container status
 	$(DC) ps
 
-psql: ## psql contra PostgreSQL directo (puerto 5432) - migraciones
+psql: ## psql against the direct PostgreSQL (port 5432) - migrations
 	$(DC) exec postgres psql -U app -d tickets
 
-psql-pgbouncer: ## psql contra PgBouncer (puerto 6432) - tráfico de la app
+psql-pgbouncer: ## psql against PgBouncer (port 6432) - app traffic
 	$(DC) exec pgbouncer psql -h 127.0.0.1 -p 5432 -U app -d tickets
 
-obs: ## Perfil obs: Prometheus, Grafana, Loki, Alloy, OTel
+obs: ## obs profile: Prometheus, Grafana, Loki, Alloy, OTel
 	$(DC_OBS) up -d --wait
 
-obs-down: ## Baja el perfil obs
+obs-down: ## Brings the obs profile down
 	$(DC_OBS) down --remove-orphans
 
-full: ## Perfil full: infra base + la app
+full: ## full profile: base infra + the app
 	$(DC_FULL) up -d --wait
 
-full-down: ## Baja el perfil full
+full-down: ## Brings the full profile down
 	$(DC_FULL) down --remove-orphans
 
-cluster: ## Perfil cluster: Redis Cluster de 6 nodos
+cluster: ## cluster profile: 6-node Redis Cluster
 	$(DC_CLU) up -d --wait
 
-cluster-down: ## Baja el Redis Cluster
+cluster-down: ## Brings the Redis Cluster down
 	$(DC_CLU) down --remove-orphans
 
-verify: ## Corre los criterios de aceptación de la HU 01.1
+verify: ## Runs the acceptance criteria of HU 01.1
 	$(VERIFY_SH) scripts/verify-ca.sh

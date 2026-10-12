@@ -3,11 +3,11 @@
   <modelVersion>4.0.0</modelVersion>
 
   <!--
-    Antes este modulo declaraba spring-boot-starter-parent 4.1.1 como parent
-    directo, con lo cual: (1) no heredaba nada de tix-platform y los quality
-    gates de HU 01.3 le pasaban por alto en silencio, y (2) el reactor
-    mezclaba Spring Boot 4.1.1 con el 4.0.0 del resto de la plataforma.
-    Ahora inherits del raiz, igual que api y waiting-room.
+    This module used to declare spring-boot-starter-parent 4.1.1 as a direct
+    parent, which meant: (1) it inherited nothing from tix-platform and the HU 01.3
+    quality gates skipped it silently, and (2) the reactor mixed Spring Boot 4.1.1
+    with the 4.0.0 of the rest of the platform. Now it inherits from the root, just
+    like api and waiting-room.
   -->
   <parent>
     <groupId>com.tix</groupId>
@@ -18,7 +18,7 @@
 
   <artifactId>worker</artifactId>
   <name>worker</name>
-  <description>Consumidor de eventos: projections, outbox y trabajo asincrono</description>
+  <description>Event consumer: projections, outbox and asynchronous work</description>
 
   <dependencies>
     <dependency>

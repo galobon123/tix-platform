@@ -7,12 +7,12 @@ scrape_configs:
     static_configs:
       - targets: ["prometheus:9090"]
 
-  # Alloy expone sus propias metricas en /metrics del servidor HTTP.
+  # Alloy exposes its own metrics at /metrics on the HTTP server.
   - job_name: alloy
     static_configs:
       - targets: ["alloy:12345"]
 
-  # Solo con el perfil `full` (make full). Sin la app, el target queda DOWN.
+  # Only with the `full` profile (make full). Without the app, the target stays DOWN.
   - job_name: api
     metrics_path: /actuator/prometheus
     static_configs:

@@ -9,7 +9,7 @@
   </parent>
   <artifactId>waitingroom</artifactId>
   <name>waiting-room</name>
-  <description>Sala de espera virtual y control de admision</description>
+  <description>Virtual waiting room and admission control</description>
   <url/>
   <licenses>
     <license/>

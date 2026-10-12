@@ -1,10 +1,10 @@
-# HU 01.3 / tarea 4: CodeQL (SAST) sobre Java.
+# HU 01.3 / task 4: CodeQL (SAST) on Java.
 #
-# CodeQL va en su propio workflow (y no como job del ci) porque es lo que
-# recomienda GitHub: asi el analisis corre en su propio grupo de checks y se
-# puede exigir por separado en branch protection.
+# CodeQL goes in its own workflow (and not as a job of ci) because that is what
+# GitHub recommends: this way the analysis runs in its own check group and can be
+# required separately in branch protection.
 #
-# Solo analiza Java: el proyecto todavia no tiene JS ni Python.
+# It only analyzes Java: the project has no JS or Python yet.
 name: codeql
 
 on:
@@ -13,8 +13,8 @@ on:
   push:
     branches: [main]
   schedule:
-    # Corre sola aunque nadie toque el repo: las queries de CodeQL se actualizan
-    # y eso puede marcar vulnerabilidades nuevas en codigo viejo.
+    # Runs on its own even if nobody touches the repo: CodeQL queries are updated
+    # and that can flag new vulnerabilities in old code.
     - cron: '17 6 * * 1'
   workflow_dispatch:
 
@@ -27,12 +27,12 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analizar
+    name: Analyze
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
-      # security-events: write es lo que le permite publicar el SARIF.
+      # security-events: write is what lets it publish the SARIF.
       security-events: write
 
     strategy:
@@ -43,27 +43,27 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Inicializar CodeQL
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          # Con Dependabot los alerts de seguridad ya se abren solos; este
-          # detector FindsDuplicateCode solo sirve si el repo es publico.
+          # With Dependabot, security alerts already open on their own; this
+          # FindsDuplicateCode detector only helps if the repo is public.
           queries: security-extended
 
-      - name: Configurar Java
+      - name: Set up Java
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
-      - name: Compilar proyecto
+      - name: Build project
         run: |
           chmod +x mvnw
           ./mvnw clean compile -DskipTests
 
-      - name: Analizar
+      - name: Analyze
         uses: github/codeql-action/analyze@v4
         with:
           category: '/language:${{ matrix.language }}'

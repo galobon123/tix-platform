@@ -1,5 +1,5 @@
-# Collector local: recibe OTLP y lo vuelca en los logs. Los exportadores
-# definitivos (Loki, Jaeger, Prometheus) se agregan con HU 09.
+# Local collector: receives OTLP and dumps it to the logs. The final
+# exporters (Loki, Jaeger, Prometheus) are added with HU 09.
 
 receivers:
   otlp:

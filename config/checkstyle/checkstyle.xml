@@ -4,15 +4,15 @@
     "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
 <!--
-  HU 01.3 tarea 4 - Checkstyle.
+  HU 01.3 task 4 - Checkstyle.
 
-  Reglas de bajo ruido que Olimpi lo que el compilador o Spotless no cubren:
-  imports, control de flujo y semantica facil de leer mal. No se exige
-  Javadoc: en este codebase seria ruido y contradiria el nivel de rigor
-  "demostracion" del Hito 1.
+  Low-noise rules that clean up what the compiler or Spotless do not cover:
+  imports, control flow and semantics that are easy to misread. Javadoc is not
+  required: in this codebase it would be noise and would contradict the
+  "demonstration" rigor level of Milestone 1.
 
-  Todo en severity=error: lo que no debe romper el build deberia quedar en
-  warning, no ensuciar la consola con nada que no vaya a fallar.
+  Everything is severity=error: whatever should not break the build should stay at
+  warning, not clutter the console with something that will not fail.
 -->
 <module name="Checker">
   <property name="charset" value="UTF-8"/>
@@ -32,7 +32,7 @@
     <module name="AvoidStarImport"/>
     <module name="IllegalImport"/>
 
-    <!-- control de flujo: el estilo mas comun de error de lectura -->
+    <!-- control flow: the most common kind of misreading error -->
     <module name="NeedBraces"/>
     <module name="LeftCurly"/>
     <module name="RightCurly"/>
@@ -48,7 +48,7 @@
     <module name="OneStatementPerLine"/>
     <module name="MultipleVariableDeclarations"/>
 
-    <!-- limites de complejidad -->
+    <!-- complexity limits -->
     <module name="MethodLength">
       <property name="max" value="60"/>
     </module>
@@ -65,8 +65,8 @@
       <property name="max" value="2"/>
     </module>
 
-    <!-- nomenclatura, relajada a proposito: las clases de dominio suelen ser
-         sustantivos de dominio y los nombres de modulo van en kebab-case -->
+    <!-- naming, deliberately relaxed: domain classes are usually domain nouns
+         and module names use kebab-case -->
     <module name="PackageName">
       <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
     </module>
@@ -76,7 +76,7 @@
     <module name="ParameterName"/>
     <module name="ConstantName"/>
 
-    <!-- TODO como warning:.visible, no bloqueante -->
+    <!-- TODO as a warning: visible, non-blocking -->
     <module name="TodoComment">
       <property name="severity" value="warning"/>
       <property name="format" value="TODO:|FIXME:"/>

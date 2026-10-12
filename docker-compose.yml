@@ -1,6 +1,6 @@
-# Servicios base (HU 01.1). Por defecto solo infraestructura base.
-# Perfiles adicionales en compose/: compose/cluster.yml (Redis Cluster),
-# compose/obs.yml (observabilidad) y compose/full.yml (app incluida).
+# Base services (HU 01.1). By default, base infrastructure only.
+# Extra profiles live in compose/: compose/cluster.yml (Redis Cluster),
+# compose/obs.yml (observability) and compose/full.yml (app included).
 name: tix-platform
 
 services:
@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: tickets
       POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define it in .env}
     ports: ["${POSTGRES_PORT:-5432}:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
@@ -17,18 +17,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-      # Sin start_period, los fallos cuentan desde el segundo cero y la primera
-      # ejecucion (initdb + CREATE DATABASE + reinicio) puede tardar mas que
-      # interval x retries, dejando el contenedor unhealthy y bloqueando a
-      # pgbouncer, que depende de service_healthy. Durante start_period los
-      # fallos no cuentan.
+      # Without start_period, failures count from second zero and the first run
+      # (initdb + CREATE DATABASE + restart) can take longer than interval x retries,
+      # leaving the container unhealthy and blocking pgbouncer, which depends on
+      # service_healthy. During start_period, failures do not count.
       start_period: 60s
 
   pgbouncer:
-    # La imagen escucha en 5432 por defecto (LISTEN_PORT); el host publica 6432.
-    # AUTH_TYPE=scram-sha-256 porque postgres:17 storea las claves con
-    # password_encryption=scram-sha-256; el entrypoint de la imagen escribe el
-    # userlist desde DATABASE_URL.
+    # The image listens on 5432 by default (LISTEN_PORT); the host publishes 6432.
+    # AUTH_TYPE=scram-sha-256 because postgres:17 stores passwords with
+    # password_encryption=scram-sha-256; the image entrypoint writes the
+    # userlist from DATABASE_URL.
     image: edoburu/pgbouncer:v1.26.0-p0
     environment:
       DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@postgres:5432/tickets
@@ -40,7 +39,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
-      # postgresql-client viene en la imagen, asi que pg_isready esta disponible.
+      # postgresql-client ships in the image, so pg_isready is available.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U app -d tickets"]
       interval: 5s
       timeout: 3s
@@ -58,9 +57,9 @@ services:
       retries: 10
 
   kafka:
-    # 4.x usa KRaft por defecto. INTERNAL es el listener para la app que corre
-    # dentro de la red de Compose (perfil full); PLAINTEXT anuncia localhost
-    # para la app que corre fuera de Docker.
+    # 4.x uses KRaft by default. INTERNAL is the listener for the app running
+    # inside the Compose network (full profile); PLAINTEXT advertises localhost
+    # for the app running outside Docker.
     image: apache/kafka:4.2.2
     ports: ["${KAFKA_PORT:-9092}:9092"]
     environment:

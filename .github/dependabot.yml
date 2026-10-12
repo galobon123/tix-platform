@@ -1,14 +1,14 @@
-# HU 01.3 / tarea 4: Dependabot.
+# HU 01.3 / task 4: Dependabot.
 #
-# Se eligio Dependabot y no Renovate porque viene incluido en GitHub, no pide
-# un token de bot y ya sabe leer poms de Maven sin configuracion extra.
+# Dependabot was chosen over Renovate because it is built into GitHub, does not ask
+# for a bot token and already knows how to read Maven poms without extra configuration.
 version: 2
 
 updates:
   # ------------------------------------------------------------------ Maven
-  # Dependabot mira UN pom por entrada. El proyecto es multi-modulo, asi que
-  # hay que declarar cada pom: con solo "/" el reactor se ignora y los modulos
-  # quedan sin cubrir. Omitir esto es el error clasico en repos multi-modulo.
+  # Dependabot looks at ONE pom per entry. The project is multi-module, so each pom
+  # has to be declared: with just "/" the reactor is ignored and the modules remain
+  # uncovered. Omitting this is the classic mistake in multi-module repos.
   - package-ecosystem: maven
     directory: /
     schedule:
@@ -17,13 +17,12 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies, java]
     groups:
-      # Testcontainers y sus modulos tienen que moverse juntos: mezclar una
-      # version de testcontainers-postgresql con otra de testcontainers-kafka
-      # rompe el build.
+      # Testcontainers and its modules have to move together: mixing one version of
+      # testcontainers-postgresql with another of testcontainers-kafka breaks the build.
       testcontainers:
         patterns: [org.testcontainers.*, com.redis.testcontainers-redis]
-      # El BOM de Spring Boot maneja el versionado de Testcontainers 2.x;
-      # tocarlo a mano pelea con el BOM.
+      # The Spring Boot BOM manages the versioning of Testcontainers 2.x;
+      # touching it by hand fights the BOM.
       spring:
         patterns: [org.springframework.*]
 
@@ -69,5 +68,5 @@ updates:
     labels: [dependencies, ci]
 
   # ------------------------------------------------------------------ Docker
-  # commented a proposito: la HU 08.1 es la que trae el Dockerfile y hasta
-  # entonces Dependabot falla con "no Dockerfile found" si se activa.
+  # deliberately commented out: HU 08.1 is the one that brings the Dockerfile and
+  # until then Dependabot fails with "no Dockerfile found" if it is enabled.
