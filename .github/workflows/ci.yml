@@ -132,3 +132,54 @@ jobs:
           exit-code: '1'
           scanners: vuln
           skip-dirs: '**/target'
+
+  # HU 03.1 / task 7: flyway validate must pass in CI (docs/03.md:150).
+  # A FRESH postgres:17 service container is used on purpose: it applies the
+  # migrations (migrate) and then checks they are internally consistent (validate).
+  # The meaningful "applied migrations are never edited" protection actually lives
+  # on databases with existing history (dev/prod); CI guarantees the migration set
+  # applies cleanly and stays consistent.
+  flyway-validate:
+    name: flyway validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tickets
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d tickets"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Enable mvnw
+        run: chmod +x mvnw
+
+      # -Duser.timezone=UTC is explicit on purpose: the pg driver sends the JVM TZ
+      # as a startup parameter and postgres:17 (debian-slim) rejects
+      # America/Buenos_Aires with FATAL 22023 (see surefire comment in pom.xml).
+      # The runner is UTC, but being explicit keeps local and CI identical.
+      - name: Apply and validate migrations
+        run: |
+          ./mvnw -B -pl api -Duser.timezone=UTC flyway:migrate
+          ./mvnw -B -pl api -Duser.timezone=UTC flyway:validate
+        env:
+          FLYWAY_URL: jdbc:postgresql://localhost:5432/tickets
+          FLYWAY_USER: app
+          FLYWAY_PASSWORD: postgres
