@@ -25,34 +25,6 @@
 
   <properties>
     <java.version>21</java.version>
-
-    <!--
-      OVERRIDE DEL BOM: revisar en cada bump de Spring Boot.
-
-      spring-boot-starter-parent 4.0.6 maneja Spring Framework 7.0.7, que tiene
-      CVE-2026-41850 (HIGH, DoS por expresiones Spel). El fix es 7.0.8 y todavia
-      no entra en el BOM, asi que se fija aca para que el gate de Trivy (tarea 4
-      de la HU 01.3) quede en verde sin excepciones.
-
-      spring-boot-starter-parent 4.0.0 (la version con la que arranco el
-      proyecto) tenia ademas CVE-2026-40976 (CRITICAL) y CVE-2026-40973 (HIGH);
-      ambos se resolvieron subiendo el parent a 4.0.6.
-
-      EL COSTO: esta propiedad gana sobre el BOM. Cuando Dependabot abra un PR
-      subiendo Spring Boot, el override se queda en 7.0.8 y puede chocar con lo
-      que la version nueva de Boot espere. Hay que tocar estas dos lineas en el
-      mismo PR que suba el parent:
-
-        1. borrar <spring-framework.version> si la nueva version de Boot ya
-           trae 7.0.8 o superior;
-        2. si se mantiene, confirmar que el build sigue verde.
-
-      Verificacion local del gate (ver README, seccion "Quality gates"): se corre
-      trivy en modo fs con severity CRITICAL,HIGH, exit-code 1 y offline-scan,
-      con el repo y el cache de .m2 montados en el container.
-    -->
-    <spring-framework.version>7.0.8</spring-framework.version>
-
     <!-- HU 01.3 tarea 3: cobertura >= 80% lineas en domain/application.
          El umbral es el de la HU; el gate es tolerante a que no haya clases
          (ver la nota de TOLERANTE A VACIO en la regla de jacoco mas abajo). -->
