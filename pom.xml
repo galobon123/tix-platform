@@ -40,7 +40,7 @@
   <!--
     HU 01.3 task 2 - Testcontainers with real PostgreSQL, Redis and Kafka.
 
-    No version is declared: spring-boot-dependencies 4.0.0 imports
+    No version is declared: spring-boot-dependencies 4.1.1 imports
     testcontainers-bom (2.0.2), which manages all three. Pinning the version here
     would fight the BOM without gaining anything.
 

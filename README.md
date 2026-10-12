@@ -314,10 +314,10 @@ Un solo comando corre todo: `./mvnw -B verify`. En orden:
 
 | Gate | Plugin | Qué falla |
 |---|---|---|
-| Formato | Spotless 2.44.5 (Google Java Format AOSP) | código o `pom.xml` sin formatear |
-| Lint | Checkstyle 10.26.1 (`config/checkstyle/checkstyle.xml`) | cualquier violación |
+| Formato | Spotless 3.10.3 (Google Java Format AOSP) | código o `pom.xml` sin formatear |
+| Lint | Checkstyle 14.3.0 (`config/checkstyle/checkstyle.xml`) | cualquier violación |
 | Tests | JUnit 5 + Testcontainers 2.0.2 | un test rojo |
-| Cobertura | JaCoCo 0.8.13 | LINE < 80 % en `domain`/`application` |
+| Cobertura | JaCoCo 0.8.15 | LINE < 80 % en `domain`/`application` |
 
 Los tests de integración levantan **PostgreSQL, Redis y Kafka reales** en contenedores
 efímeros (`postgres:17`, `redis:7`, `apache/kafka:4.2.2`). No hay H2 ni broker embebido:
