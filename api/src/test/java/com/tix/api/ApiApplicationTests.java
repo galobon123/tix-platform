@@ -7,7 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
         properties = {
             "app.config.db-url=jdbc:postgresql://localhost:5432/tickets",
             "app.config.redis-locks-url=redis://localhost:6379",
-            "app.config.jwt-secret=test-secret-test-secret-test-secret"
+            "app.config.jwt-secret=test-secret-test-secret-test-secret",
+            "spring.flyway.enabled=false"
         })
 class ApiApplicationTests {
 
