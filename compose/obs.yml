@@ -1,9 +1,9 @@
-# Perfil `obs`: stack de observabilidad (HU 09). Se usa con la infra base:
+# `obs` profile: observability stack (HU 09). Used together with the base infra:
 #   make obs
 #   make obs-down
 #
-# Prometheus y Alloy se scrapean entre si por el servicio, no por localhost:
-# cada contenedor ve a los otros por el DNS de la red de Compose.
+# Prometheus and Alloy scrape each other by service name, not by localhost:
+# each container sees the others through the Compose network DNS.
 name: tix-platform
 
 services:
@@ -57,7 +57,7 @@ services:
     image: grafana/grafana:13.2.3
     profiles: ["obs"]
     environment:
-      # Credencial solo de desarrollo local. En staging/prod sale de un secreto.
+      # Local development credential only. In staging/prod it comes from a secret.
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "true"

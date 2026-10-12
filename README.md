@@ -97,6 +97,60 @@ El DDL y los *locks* de `pg_*` no sobreviven eso, así que Flyway conecta siempr
 fuera de Docker, e `INTERNAL://kafka:29092` para la que corre dentro (perfil `full`).
 Con un solo listener la app dentro de la red no resuelve el broker.
 
+## Configuración y variables de entorno
+
+Toda la configuración entra por **variables de entorno**. Hay tres reglas que explican el
+resto:
+
+1. **Docker Compose lee `.env` solo.** Por eso `.env` está en `.gitignore` (CA 5 de
+   HU 01.1) y lo que se versiona es `.env.example`. Se copia una vez antes de arrancar:
+   `cp .env.example .env`.
+2. **Spring Boot no lee `.env`.** Es un archivo de Compose, no de la app. Si corrés la
+   app fuera de Docker, las variables se exportan en la shell; `.env` no la alcanza.
+3. **Una variable exportada en la shell pisa a `.env`.** Compose respeta primero lo que
+   ya está en el entorno. Si un cambio "no toma", compará `grep '^VAR=' .env` con el
+   valor exportado.
+
+El contrato de qué es configurable es `.env.example`: si una variable no aparece ahí, no
+se puede setear sin tocar un archivo.
+
+### Fail-fast (HU 01.4)
+
+La app **no arranca** si falta la configuración vital. `FailFastConfig` valida las
+propiedades al bound y el arranque termina con exit ≠ 0 antes de aceptar tráfico:
+
+| Propiedad | Variable | Regla |
+|---|---|---|
+| `app.config.db-url` | `DB_URL` | no vacía |
+| `app.config.redis-locks-url` | `REDIS_LOCKS_URL` | no vacía |
+| `app.config.jwt-secret` | `JWT_SECRET` | no vacía y ≥ 32 caracteres (256 bits) |
+
+No hay valores por defecto: en `application.yaml` los tres son `${VAR:}` a propósito, así
+que un entorno incompleto se cae en el arranque y no a mitad de camino. La contra es que
+el `JWT_SECRET=change-me` de `.env.example` mide 9 caracteres, así que el perfil `full`
+**falla a propósito** hasta que pongas un secreto real de 32+.
+
+### Quién consume cada variable
+
+| Variable | La usa | Notas |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Compose | obligatoria (`:?`); la comparten Postgres y PgBouncer |
+| `REDIS_PASSWORD` | Compose | obligatoria; Redis arranca con `--requirepass` y viaja dentro de `REDIS_URL` |
+| `JWT_SECRET` | app | ≥ 32 caracteres (fail-fast) |
+| `POSTGRES_PORT` `PGBOUNCER_PORT` `REDIS_PORT` `KAFKA_PORT` `API_PORT` | Compose | puertos publicados en el host |
+| `DB_URL` | app | conexión **directa** a Postgres (5432); es la que usa el `datasource` hoy |
+| `POOL_URL` | app | prevista para el tráfico vía PgBouncer (6432); todavía no cableada |
+| `DB_USER` `DB_PASSWORD` | app | `DB_PASSWORD` tiene que igualar a `POSTGRES_PASSWORD` |
+| `REDIS_LOCKS_URL` | app | locks; es la que valida el fail-fast |
+| `REDIS_URL` | app | prevista; todavía no cableada |
+| `KAFKA_BOOTSTRAP_SERVERS` | app | `localhost:9092` afuera; `kafka:29092` adentro |
+| `API_IMAGE` | Compose | perfil `full` |
+| `PROMETHEUS_PORT` `GRAFANA_PORT` `LOKI_PORT` `ALLOY_PORT` `OTEL_GRPC_PORT` `OTEL_HTTP_PORT` `GRAFANA_ADMIN_USER` `GRAFANA_ADMIN_PASSWORD` | Compose | perfil `obs` |
+
+Dentro de la red de Compose los hosts y puertos cambian (`postgres:5432`, `pgbouncer:5432`,
+`kafka:29092`); eso lo fija `compose/full.yml`, no `.env`. De ahí los dos juegos de URLs:
+uno para correr afuera y otro para correr adentro.
+
 ## Perfiles
 
 Por defecto `make up` levanta **solo la infraestructura base**. Los demás perfiles se
@@ -177,7 +231,7 @@ make reset && make up   # `reset` porque el volumen quedó ligado al postgres vi
 
 **`failed to solve ... POSTGRES_PASSWORD` o el compose no levanta**
 Falta `.env` o `POSTGRES_PASSWORD` está vacío. Es una variable obligatoria a
-propósito (`${POSTGRES_PASSWORD:?definir en .env}`): si el compose arrancara con la
+propósito (`${POSTGRES_PASSWORD:?define it in .env}`): si el compose arrancara con la
 contraseña vacía, el primer `psql` al que se conecte crearía el rol con clave en
 blanco.
 
@@ -234,7 +288,7 @@ siempre verificá con `grep '^POSTGRES_PASSWORD=' .env` qué espera el compose d
 
 **Un `.env` con `DB_URL` apuntando a `pgbouncer:5432` no resuelve desde el host**
 `pgbouncer` es el nombre del servicio dentro de la red de Compose. Desde el host va
-`localhost:6432`. Está en `.env.example` con los dos casos commented.
+`localhost:6432`. Está en `.env.example` con los dos casos comentados.
 
 ## Criterios de aceptación de la HU 01.1
 
@@ -250,9 +304,9 @@ siempre verificá con `grep '^POSTGRES_PASSWORD=' .env` qué espera el compose d
 | 5 | `.env` está en `.gitignore`, `.env.example` existe y `.env` no está trackeado | OK (3 de 3; el chequeo de tracking se omite hasta que haya `git init`) |
 
 El script es `scripts/verify-ca.sh`. **El CA 4 tiene una segunda mitad —"las migraciones
-usan el directo"— que sigue sin verificarse**: no hay Flyway ni `datasource` en
-`application.yaml`, así que no hay migración que todavía. Se cierra en HU 03.1; mientras
-tanto la separación de URLs queda documentada arriba y en `.env.example`.
+usan el directo"— que sigue sin verificarse**: todavía no hay Flyway ni migraciones (el
+`datasource` ya apunta al directo, pero no hay nada que migrar). Se cierra en HU 03.1;
+mientras tanto la separación de URLs queda documentada arriba y en `.env.example`.
 
 ## Quality gates (HU 01.3)
 
@@ -260,10 +314,10 @@ Un solo comando corre todo: `./mvnw -B verify`. En orden:
 
 | Gate | Plugin | Qué falla |
 |---|---|---|
-| Formato | Spotless 2.44.5 (Google Java Format AOSP) | código o `pom.xml` sin formatear |
-| Lint | Checkstyle 10.26.1 (`config/checkstyle/checkstyle.xml`) | cualquier violación |
+| Formato | Spotless 3.10.3 (Google Java Format AOSP) | código o `pom.xml` sin formatear |
+| Lint | Checkstyle 14.3.0 (`config/checkstyle/checkstyle.xml`) | cualquier violación |
 | Tests | JUnit 5 + Testcontainers 2.0.2 | un test rojo |
-| Cobertura | JaCoCo 0.8.13 | LINE < 80 % en `domain`/`application` |
+| Cobertura | JaCoCo 0.8.15 | LINE < 80 % en `domain`/`application` |
 
 Los tests de integración levantan **PostgreSQL, Redis y Kafka reales** en contenedores
 efímeros (`postgres:17`, `redis:7`, `apache/kafka:4.2.2`). No hay H2 ni broker embebido:

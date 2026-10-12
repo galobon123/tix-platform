@@ -1,13 +1,13 @@
-# HU 01.3 / tarea 1 y 2: build + tests + cobertura en cada PR.
+# HU 01.3 / tasks 1 to 4: build + tests + coverage, secrets and dependencies on every PR.
 #
-# Alcance deliberado: solo tareas 1 a 4 de la HU. La imagen (tarea 5) no entra
-# porque no hay Dockerfile todavia (llega con HU 08.1).
+# Deliberate scope: only tasks 1 to 4 of the HU. The image (task 5) is not included
+# because there is no Dockerfile yet (it arrives with HU 08.1).
 #
-# POR QUE LAS actions NO ESTAN FIJADAS POR SHA: la referencia de la HU pide
-# fijarlas por SHA completo en produccion. No se hace aqui porque un SHA
-# inventado rompe el workflow y uno aproximado rompe la seguridad que se
-# quiere ganar. Se deja por version mayor, que es funcional, y queda como
-# pendiente explicito antes de publicar el repo.
+# ACTIONS PINNED BY SHA: each "uses:" points to the full commit and carries, on the
+# side, as a comment, the version it represents. A tag can move (in March 2026 almost
+# all aquasecurity/trivy-action tags were rewritten); a SHA cannot. To update,
+# Dependabot (github-actions ecosystem) opens the PR with the new SHA and the version
+# comment: see .github/dependabot.yml.
 name: ci
 
 on:
@@ -17,105 +17,113 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# permisos minimos: este workflow solo lee el repo
+# minimal permissions: this workflow only reads the repo
 permissions:
   contents: read
 
-# un push nuevo mata el run anterior del mismo PR: el PR no necesita 5 builds
-# simultaneos y esto ayuda al p90 de < 10 min
+# a new push kills the previous run of the same PR: the PR does not need 5
+# simultaneous builds and this helps the p90 of < 10 min. On main it is NOT cancelled:
+# that way every main commit keeps its CI result.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-test:
-    name: Build, tests y cobertura
+    name: Build, tests and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
-      # En Windows el bit de ejecucion no viaja en el commit, asi que en un
-      # runner linux ./mvnw puede dar Permission denied. Sin esto, el fallo
-      # parece de Maven y no de permisos.
-      - name: Habilitar mvnw
+      # On Windows the executable bit does not travel in the commit, so on a linux
+      # runner ./mvnw can give Permission denied. Without this, the failure looks like
+      # a Maven problem and not a permissions problem.
+      - name: Enable mvnw
         run: chmod +x mvnw
 
-      # verify corre, en orden: checkstyle (validate) -> tests (test) ->
+      # verify runs, in order: checkstyle (validate) -> tests (test) ->
       # jacoco:report + jacoco:check + spotless:check (verify).
-      # Los tests de integracion levantan PostgreSQL, Redis y Kafka REALES con
-      # Testcontainers; el runner ya trae Docker, asi que corren de verdad.
-      - name: Build, tests y cobertura
+      # The integration tests bring up REAL PostgreSQL, Redis and Kafka with
+      # Testcontainers; the runner already ships Docker, so they really run.
+      # IMPORTANT (pom): jacoco:report must run BEFORE jacoco:check; otherwise, when
+      # the threshold fails, the report is not generated exactly when it is needed.
+      - name: Build, tests and coverage
         run: ./mvnw -B verify
 
-      # Los reportes de JaCoCo quedan como artefacto para poder ver que clase
-      # bajo la cobertura, sin tener que reproducir el build.
-      - name: Subir reporte de cobertura
+      # The full JaCoCo HTML report is kept as an artifact to see which class dropped
+      # in coverage, without having to reproduce the build.
+      - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jacoco-report
-          path: '**/target/site/jacoco/jacoco.csv'
+          path: '**/target/site/jacoco/'
           if-no-files-found: ignore
 
   gitleaks:
-    name: gitleaks (secretos)
+    name: gitleaks (secrets)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # gitleaks con fetch-depth: 0 necesita todo el historico para buscar
-          # secretos en commits viejos, no solo en el diff del PR.
+          # gitleaks with fetch-depth: 0 needs the whole history to look for secrets
+          # in old commits, not only in the PR diff.
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+          # Only if the repo belongs to a GitHub ORGANIZATION (on a personal account it
+          # is not needed). Free license at gitleaks.io, stored as a repo secret.
+          # Uncomment in that case:
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   trivy:
-    name: trivy (dependencias)
+    name: trivy (dependencies)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-      # Trivy cachea su base de datos con actions/cache, y eso exige actions: write.
+      # Trivy caches its database with actions/cache, and that requires actions: write.
+      # (Note: this is not in the trivy-action documentation. If there was no real error
+      # requiring it, it can be tried without this permission.)
       actions: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
-      - name: Habilitar mvnw
+      - name: Enable mvnw
         run: chmod +x mvnw
 
-      # Trivy resuelve el arbol de dependencias de Maven por red si no encuentra
-      # el artefacto en el repositorio local. En un runner de GitHub eso se topa
-      # con el rate limit de Maven Central y Trivy muere con FATAL 429, o sea un
-      # build rojo que no tiene nada que ver con una vulnerabilidad. Poblando el
-      # cache primero, Trivy resuelve todo local y el unico fallo posible es un
-      # CVE real.
-      - name: Poblar cache local de Maven
+      # Trivy resolves the Maven dependency tree over the network if it cannot find
+      # the artifact in the local repository. On a GitHub runner that hits Maven
+      # Central's rate limit and Trivy dies with FATAL 429, that is, a red build that
+      # has nothing to do with a vulnerability. By populating the cache first, Trivy
+      # resolves everything locally and the only possible failure is a real CVE.
+      - name: Populate the local Maven cache
         run: ./mvnw -B -q dependency:go-offline
 
-      # scan-type: fs, no image. La HU pide analisis de dependencias y todavia
-      # no hay Dockerfile ni imagen que escanear (HU 08.1). Este job escanea el
-      # arbol de fuentes: los pom.xml y el cache de Maven.
+      # scan-type: fs, not image. The HU asks for dependency analysis and there is still
+      # no Dockerfile or image to scan (HU 08.1). This job scans the source tree: the
+      # pom.xml files and the Maven cache.
       #
-      # scanners: vuln solamente. Los secretos los cubre gitleaks, en su propio
-      # job; duplicar el scanner de secretos aqui solo anade ruido. 
-      - name: Escanear dependencias del arbol de fuentes
-        uses: aquasecurity/trivy-action@v0.36.0
+      # scanners: vuln only. Secrets are covered by gitleaks, in its own job;
+      # duplicating the secrets scanner here only adds noise.
+      - name: Scan source tree dependencies
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .

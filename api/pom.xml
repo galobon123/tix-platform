@@ -9,7 +9,7 @@
   </parent>
   <artifactId>api</artifactId>
   <name>api</name>
-  <description>API REST: registro, login, hold, checkout y emision de tickets</description>
+  <description>REST API: registration, login, hold, checkout and ticket issuance</description>
   <url/>
   <licenses>
     <license/>
@@ -31,7 +31,18 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter</artifactId>
     </dependency>
-
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
@@ -39,12 +50,10 @@
     </dependency>
 
     <!--
-			HU 01.3 tarea 2: drivers para que el test de integracion hable con los
-			contenedores de verdad. Postgres y Kafka no venian con spring-boot-starter
-			(solo trae el core). Version administrada por el BOM de Spring Boot, sin
-			version explicita. Redis no necesita driver: el test habla RESP por socket.
-			Cuando 03.1 meta el datasource y Flyway, estos pasan a ser dependencias de
-			compilacion y el driver de postgres deja de ser solo de test.
+			HU 01.3 task 2: drivers so the integration test talks to the real
+			containers. Postgres and Kafka did not come with spring-boot-starter
+			(it only brings the core). Version managed by the Spring Boot BOM, with no
+			explicit version. Redis needs no driver: the test speaks RESP over a socket.
 		-->
     <dependency>
       <groupId>org.postgresql</groupId>

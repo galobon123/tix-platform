@@ -1,3 +1,19 @@
 spring:
   application:
     name: api
+  datasource:
+    # Uses the property validated in FailFastConfig.
+    url: ${app.config.db-url}
+    username: ${DB_USER:app}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      # Binds the Redis Locks URL.
+      url: ${app.config.redis-locks-url}
+
+# Environment variable mapping for the fail-fast check.
+app:
+  config:
+    db-url: ${DB_URL:}             # If missing from the environment, defaults to an empty String ""
+    redis-locks-url: ${REDIS_LOCKS_URL:}
+    jwt-secret: ${JWT_SECRET:}

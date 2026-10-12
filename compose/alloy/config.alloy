@@ -1,6 +1,6 @@
-// Alloy: descubrimiento de contenedores + envio de logs a Loki.
-// Las metricas propias se exportan en /metrics del servidor HTTP (puerto 12345),
-// que es lo que Prometheus scrapea. No hay remote_write para no realimentar.
+// Alloy: container discovery + log shipping to Loki.
+// Its own metrics are exposed at /metrics on the HTTP server (port 12345),
+// which is what Prometheus scrapes. There is no remote_write, to avoid feedback loops.
 
 logging {
   level  = "info"

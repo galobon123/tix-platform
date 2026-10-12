@@ -21,38 +21,39 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-// El paquete .containers.KafkaContainer es el viejo: espera confluentinc/cp-kafka y
-// rechaza apache/kafka con "Failed to verify that image ... is a compatible substitute".
-// El de .kafka es el que habla KRaft nativo y usa apache/kafka directamente.
+// The .containers.KafkaContainer package is the old one: it expects confluentinc/cp-kafka and
+// rejects apache/kafka with "Failed to verify that image ... is a compatible substitute".
+// The one under .kafka is the one that speaks native KRaft and uses apache/kafka directly.
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * HU 01.3, tarea 2: la suite de integracion tiene que correr contra PostgreSQL, Redis y Kafka
- * REALES via Testcontainers, no contra H2 ni un broker embebido.
+ * HU 01.3, task 2: the integration suite must run against REAL PostgreSQL, Redis and Kafka via
+ * Testcontainers, not against H2 or an embedded broker.
  *
- * <p>Este test no prueba negocio: prueba que la infraestructura de test del proyecto funciona. Sin
- * el, el gate quedaria como configuracion no verificada, que es exactamente lo que la HU pide
- * evitar.
+ * <p>This test does not test business logic: it tests that the project's test infrastructure works.
+ * Without it, the gate would be unverified configuration, which is exactly what the HU asks to
+ * avoid.
  *
- * <p>Usa las mismas imagenes que el stack de HU 01.1 a proposito, para que un run local no
- * descargue nada extra:
+ * <p>It deliberately uses the same images as the HU 01.1 stack, so a local run downloads nothing
+ * extra:
  *
  * <ul>
- *   <li>Testcontainers 2.x cambio los nombres de los modulos: {@code
- *       org.testcontainers.postgresql.PostgreSQLContainer} y {@code
- *       org.testcontainers.kafka.KafkaContainer} ya no estan en {@code
- *       org.testcontainers.containers}. Redis es la excepcion: su groupId es {@code com.redis}.
- *   <li>Redis se verifica speaking RESP crudo por socket (PING -> PONG) en vez de agregar un
- *       cliente mas al classpath. La prueba es mas chica y no depende de la version del driver.
+ *   <li>Testcontainers 2.x renamed the modules: {@code
+ *       org.testcontainers.postgresql.PostgreSQLContainer} and {@code
+ *       org.testcontainers.kafka.KafkaContainer} are no longer in {@code
+ *       org.testcontainers.containers}. Redis is the exception: its groupId is {@code com.redis}.
+ *   <li>Redis is verified by speaking raw RESP over a socket (PING -> PONG) instead of adding
+ *       another client to the classpath. The check is smaller and does not depend on the driver
+ *       version.
  * </ul>
  *
- * <p>{@code disabledWithoutDocker} hace que la clase se saltee sola si no hay Docker, en vez de
- * romper el build. Es la diferencia entre "el CI no puede correr" y "el CI no corrio esto".
+ * <p>{@code disabledWithoutDocker} makes the class skip itself when Docker is unavailable, instead
+ * of breaking the build. It is the difference between "CI cannot run" and "CI did not run this".
  */
 @Testcontainers(disabledWithoutDocker = true)
-@DisplayName("HU 01.3 T2 - Testcontainers levanta PostgreSQL, Redis y Kafka reales")
+@DisplayName("HU 01.3 T2 - Testcontainers starts real PostgreSQL, Redis and Kafka")
 class TestcontainersInfraTest {
 
     @Container
@@ -74,53 +75,53 @@ class TestcontainersInfraTest {
                     .withStartupTimeout(Duration.ofMinutes(2));
 
     @Test
-    @DisplayName("PostgreSQL: una consulta real responde por JDBC")
-    void postgresRespondeUnaConsultaReal() throws Exception {
+    @DisplayName("PostgreSQL: a real query responds over JDBC")
+    void postgresRespondsToARealQuery() throws Exception {
         String url = POSTGRES.getJdbcUrl();
         String user = POSTGRES.getUsername();
         String password = POSTGRES.getPassword();
 
         try (Connection con = DriverManager.getConnection(url, user, password);
                 Statement st = con.createStatement();
-                ResultSet rs = st.executeQuery("select 1 as valor, current_database() as db")) {
+                ResultSet rs = st.executeQuery("select 1 as value, current_database() as db")) {
 
             assertThat(rs.next()).isTrue();
-            assertThat(rs.getInt("valor")).isEqualTo(1);
+            assertThat(rs.getInt("value")).isEqualTo(1);
             assertThat(rs.getString("db")).isEqualTo("tickets_test");
         }
     }
 
     @Test
-    @DisplayName("Redis: PING responde PONG por RESP crudo")
-    void redisRespondePing() throws Exception {
+    @DisplayName("Redis: PING responds PONG over raw RESP")
+    void redisRespondsToPing() throws Exception {
         try (Socket socket = new Socket(REDIS.getRedisHost(), REDIS.getRedisPort())) {
             OutputStream out = socket.getOutputStream();
             out.write("PING\r\n".getBytes(StandardCharsets.US_ASCII));
             out.flush();
 
-            String respuesta = leerLinea(socket.getInputStream());
+            String response = readLine(socket.getInputStream());
 
-            assertThat(respuesta).isEqualTo("+PONG");
+            assertThat(response).isEqualTo("+PONG");
         }
     }
 
     @Test
-    @DisplayName("Kafka: el broker responde un AdminClient.listTopics")
-    void kafkaRespondeListTopics() throws Exception {
+    @DisplayName("Kafka: the broker responds to an AdminClient.listTopics")
+    void kafkaRespondsToListTopics() throws Exception {
         Map<String, Object> config =
                 Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
 
         try (Admin admin = Admin.create(config)) {
             Set<String> topics = admin.listTopics().names().get();
 
-            // No se afirma que este vacio: 07.1+ van a crear topics. Se afirma que el broker
-            // respondio, que es lo que prueba que el container quedo operativo.
+            // It does not assert that this is empty: 07.1+ will create topics. It asserts that the
+            // broker responded, which is what proves the container came up operational.
             assertThat(topics).isNotNull();
         }
     }
 
-    /** Lee una linea CRLF-terminada de un stream de sockets. El protocolo RESP usa CRLF. */
-    private static String leerLinea(InputStream in) throws IOException {
+    /** Reads a CRLF-terminated line from a socket stream. The RESP protocol uses CRLF. */
+    private static String readLine(InputStream in) throws IOException {
         StringBuilder sb = new StringBuilder();
         int c;
         while ((c = in.read()) != -1) {

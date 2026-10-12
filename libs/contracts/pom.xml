@@ -11,5 +11,5 @@
 
   <artifactId>contracts</artifactId>
   <name>contracts</name>
-  <description>Eventos y DTOs compartidos entre servicios (Java puro)</description>
+  <description>Events and DTOs shared between services (plain Java)</description>
 </project>
