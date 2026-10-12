@@ -14,7 +14,7 @@
   <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>tix-platform</name>
-  <description>Plataforma de venta de tickets - Walking skeleton (HU 01.3)</description>
+  <description>Ticket selling platform - Walking skeleton (HU 01.3)</description>
 
   <modules>
     <module>libs/contracts</module>
@@ -25,12 +25,12 @@
 
   <properties>
     <java.version>21</java.version>
-    <!-- HU 01.3 tarea 3: cobertura >= 80% lineas en domain/application.
-         El umbral es el de la HU; el gate es tolerante a que no haya clases
-         (ver la nota de TOLERANTE A VACIO en la regla de jacoco mas abajo). -->
+    <!-- HU 01.3 task 3: coverage >= 80% lines in domain/application.
+         The threshold comes from the HU; the gate is tolerant of there being no
+         classes (see the EMPTY-TOLERANT note in the jacoco rule below). -->
     <jacoco.line.min>0.80</jacoco.line.min>
 
-    <!-- Plugins: Spring Boot no los administra, van con version explicita. -->
+    <!-- Plugins: Spring Boot does not manage them, so they go with an explicit version. -->
     <jacoco.version>0.8.15</jacoco.version>
     <spotless.version>3.10.3</spotless.version>
     <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
@@ -38,22 +38,26 @@
   </properties>
 
   <!--
-    HU 01.3 tarea 2 - Testcontainers con PostgreSQL, Redis y Kafka reales.
+    HU 01.3 task 2 - Testcontainers with real PostgreSQL, Redis and Kafka.
 
-    No se declara version: spring-boot-dependencies 4.0.0 importa
-    testcontainers-bom (2.0.2), que maneja los tres. Fijar la version aca
-    pelearia con el BOM sin ganar nada.
+    No version is declared: spring-boot-dependencies 4.0.0 imports
+    testcontainers-bom (2.0.2), which manages all three. Pinning the version here
+    would fight the BOM without gaining anything.
 
-    OJO con los nombres: en Testcontainers 2.x todos los modulos se renombraron
-    a testcontainers-<nombre>. Los nombres cortos (org.testcontainers:postgresql,
-    org.testcontainers:junit-jupiter) son de 1.x y NO existen en 2.x; dan
-    "version is missing" porque el BOM no los conoce.
+    WATCH OUT for the names: in Testcontainers 2.x all modules were renamed to
+    testcontainers-<name>. The short names (org.testcontainers:postgresql,
+    org.testcontainers:junit-jupiter) are from 1.x and do NOT exist in 2.x; they give
+    "version is missing" because the BOM does not know them.
 
-    Redis es la excepcion doble: no esta en testcontainers-bom (Spring Boot lo
-    maneja aparte, version 2.2.4) y su groupId cambio a com.redis. O sea
-    com.redis:testcontainers-redis, no org.testcontainers:testcontainers-redis.
+    Redis is the double exception: it is not in testcontainers-bom (Spring Boot
+    manages it separately, version 2.2.4) and its groupId changed to com.redis. That
+    is, com.redis:testcontainers-redis, not org.testcontainers:testcontainers-redis.
   -->
   <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-testcontainers</artifactId>
@@ -110,7 +114,7 @@
     </pluginManagement>
 
     <plugins>
-      <!-- ============================ HU 01.3 / tarea 3: cobertura ============ -->
+      <!-- ============================ HU 01.3 / task 3: coverage =============== -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -136,24 +140,23 @@
             <phase>verify</phase>
             <configuration>
               <!--
-                TOLERANTE A VACIO, A PROPOSITO.
+                EMPTY-TOLERANT, ON PURPOSE.
 
-                Los paquetes domain/application existen pero estan vacios: el
-                primer codigo real llega con HU 02.1 (POST /register). El
-                proyecto today no tiene nada que medir ahi, asi que el bundle
-                filtra vacio y el check pasa sin que haya nada que medir. En
-                cuanto haya una clase, el gate empieza a exigir 80% solo, sin
-                tocar nada.
+                The domain/application packages exist but are empty: the first real
+                code arrives with HU 02.1 (POST /register). Today the project has
+                nothing to measure there, so the bundle filters out empty and the
+                check passes with nothing to measure. As soon as there is a class,
+                the gate starts demanding 80% by itself, without touching anything.
 
-                Para comprobar que un PR no baja del 80%: mvn
-                -Djacoco.line.min=0.99 verify (debe fallar).
+                To verify that a PR does not drop below 80%: mvn
+                -Djacoco.line.min=0.99 verify (it must fail).
 
-                El filtro de paquetes va ACÁ y no dentro de <rule>. Probado: el
-                <includes> de la regla matchea vacio siempre (se probo con
-                notacion de barras, de puntos y hasta vacio) y el gate queda
-                muerto para siempre sin avisar. El <includes> del goal si
-                filtra, y se verifica levantando una clase sin tests y viendo
-                que el build falla.
+                The package filter goes HERE and not inside <rule>. Tested: the
+                <includes> of the rule always matches empty (tested with slash
+                notation, dot notation and even empty) and the gate stays dead
+                forever without warning. The <includes> of the goal does filter, and
+                it is verified by adding a class without tests and watching the build
+                fail.
               -->
               <includes>
                 <include>com/tix/**/domain/**</include>
@@ -176,7 +179,7 @@
         </executions>
       </plugin>
 
-      <!-- ============================ HU 01.3 / tarea 4: formato y lint ======== -->
+      <!-- ============================ HU 01.3 / task 4: format and lint ======== -->
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
@@ -197,8 +200,8 @@
           </pom>
         </configuration>
         <executions>
-          <!-- check corre en verify: si el codigo esta sin formatear, el build
-               falla. apply es local: mvn spotless:apply -->
+          <!-- check runs on verify: if the code is unformatted, the build fails.
+               apply is local: mvn spotless:apply -->
           <execution>
             <id>spotless-check</id>
             <goals>
@@ -231,27 +234,27 @@
         </executions>
       </plugin>
 
-      <!-- ==================== tests deterministas (HU 01.3 / tarea 2) ============ -->
+      <!-- ==================== deterministic tests (HU 01.3 / task 2) ============ -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <!--
-            -Duser.timezone=UTC NO es cosmetico: es lo que hace que el gate de
-            Testcontainers de PostgreSQL sea reproducible.
+            -Duser.timezone=UTC is NOT cosmetic: it is what makes the PostgreSQL
+            Testcontainers gate reproducible.
 
-            El driver de PostgreSQL manda como parametro de arranque "TimeZone" la
-            zona por defecto de la JVM. La imagen postgres:17 (Debian slim) no trae
-            America/Buenos_Aires en su tzdata y el servidor la rechaza con:
+            The PostgreSQL driver sends the JVM default timezone as the "TimeZone"
+            startup parameter. The postgres:17 image (Debian slim) does not ship
+            America/Buenos_Aires in its tzdata and the server rejects it with:
 
               PSQL FATAL: invalid value for parameter "TimeZone": "America/Buenos_Aires"
 
-            Sin esto el test pasa en un runner en UTC y falla en cualquier maquina de
-            Argentina o Uruguay. Probado: pasar TimeZone=UTC en la URL de JDBC NO
-            alcanza, el driver lo pisa con la zona de la JVM.
+            Without this, the test passes on a UTC runner and fails on any machine in
+            Argentina or Uruguay. Tested: passing TimeZone=UTC in the JDBC URL is NOT
+            enough, the driver overrides it with the JVM timezone.
 
-            @{argLine} conserva el agente de JaCoCo, que prepare-agent deja en esa
-            misma propiedad. Sin esto la cobertura se perderia en silencio.
+            @{argLine} keeps the JaCoCo agent, which prepare-agent leaves in that same
+            property. Without this, coverage would be lost silently.
           -->
           <argLine>@{argLine} -Duser.timezone=UTC</argLine>
         </configuration>
