@@ -18,8 +18,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?define it in .env}
       # App traffic, pooled.
       POOL_URL: jdbc:postgresql://pgbouncer:5432/tickets
-      REDIS_URL: redis://redis:6379
-      REDIS_LOCKS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:?define it in .env}@redis:6379
+      REDIS_LOCKS_URL: redis://:${REDIS_PASSWORD:?define it in .env}@redis:6379
       # INTERNAL listener: inside the Compose network localhost is not used.
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4317

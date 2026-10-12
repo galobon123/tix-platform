@@ -135,7 +135,7 @@ el `JWT_SECRET=change-me` de `.env.example` mide 9 caracteres, así que el perfi
 | Variable | La usa | Notas |
 |---|---|---|
 | `POSTGRES_PASSWORD` | Compose | obligatoria (`:?`); la comparten Postgres y PgBouncer |
-| `REDIS_PASSWORD` | Compose | |
+| `REDIS_PASSWORD` | Compose | obligatoria; Redis arranca con `--requirepass` y viaja dentro de `REDIS_URL` |
 | `JWT_SECRET` | app | ≥ 32 caracteres (fail-fast) |
 | `POSTGRES_PORT` `PGBOUNCER_PORT` `REDIS_PORT` `KAFKA_PORT` `API_PORT` | Compose | puertos publicados en el host |
 | `DB_URL` | app | conexión **directa** a Postgres (5432); es la que usa el `datasource` hoy |
