@@ -6,12 +6,19 @@ name: tix-platform
 services:
   postgres:
     image: postgres:17
+    # pg_stat_statements (HU 03.2 / task 3): query-latency telemetry to measure the
+    # p99 of the seat-availability query. It is a PRELOADED library, so the server
+    # has to start with it. The extension itself is created by the init script
+    # mounted below, which only runs on a fresh data volume.
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_DB: tickets
       POSTGRES_USER: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define it in .env}
     ports: ["${POSTGRES_PORT:-5432}:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./config/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d tickets"]
       interval: 5s
