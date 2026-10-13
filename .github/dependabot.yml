@@ -28,6 +28,12 @@ updates:
 
   - package-ecosystem: maven
     directory: /libs/contracts
+    ignore:
+    - dependency-name: com.diffplug.spotless:spotless-maven-plugin
+    - dependency-name: org.jacoco:jacoco-maven-plugin
+    - dependency-name: org.apache.maven.plugins:maven-checkstyle-plugin
+    - dependency-name: com.puppycrawl.tools:checkstyle
+    - dependency-name: com.fasterxml.jackson:jackson-bom
     schedule:
       interval: weekly
       day: monday
@@ -36,6 +42,12 @@ updates:
 
   - package-ecosystem: maven
     directory: /api
+    ignore:
+    - dependency-name: com.diffplug.spotless:spotless-maven-plugin
+    - dependency-name: org.jacoco:jacoco-maven-plugin
+    - dependency-name: org.apache.maven.plugins:maven-checkstyle-plugin
+    - dependency-name: com.puppycrawl.tools:checkstyle
+    - dependency-name: com.fasterxml.jackson:jackson-bom
     schedule:
       interval: weekly
       day: monday
@@ -44,6 +56,12 @@ updates:
 
   - package-ecosystem: maven
     directory: /worker
+    ignore:
+    - dependency-name: com.diffplug.spotless:spotless-maven-plugin
+    - dependency-name: org.jacoco:jacoco-maven-plugin
+    - dependency-name: org.apache.maven.plugins:maven-checkstyle-plugin
+    - dependency-name: com.puppycrawl.tools:checkstyle
+    - dependency-name: com.fasterxml.jackson:jackson-bom
     schedule:
       interval: weekly
       day: monday
@@ -52,6 +70,12 @@ updates:
 
   - package-ecosystem: maven
     directory: /waiting-room
+    ignore:
+    - dependency-name: com.diffplug.spotless:spotless-maven-plugin
+    - dependency-name: org.jacoco:jacoco-maven-plugin
+    - dependency-name: org.apache.maven.plugins:maven-checkstyle-plugin
+    - dependency-name: com.puppycrawl.tools:checkstyle
+    - dependency-name: com.fasterxml.jackson:jackson-bom
     schedule:
       interval: weekly
       day: monday
